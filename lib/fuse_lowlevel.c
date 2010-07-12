@@ -34,6 +34,10 @@
 #define PARAM(inarg) (((char *)(inarg)) + sizeof(*(inarg)))
 #define OFFSET_MAX 0x7fffffffffffffffLL
 
+#define container_of(ptr, type, member) ({				\
+			const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+			(type *)( (char *)__mptr - offsetof(type,member) );})
+
 struct fuse_pollhandle {
 	uint64_t kh;
 	struct fuse_chan *ch;
@@ -1633,10 +1637,58 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	send_reply_ok(req, NULL, 0);
 }
 
+static void list_del_nreq(struct fuse_notify_req *nreq)
+{
+	struct fuse_notify_req *prev = nreq->prev;
+	struct fuse_notify_req *next = nreq->next;
+	prev->next = next;
+	next->prev = prev;
+}
+
+static void list_add_nreq(struct fuse_notify_req *nreq,
+			  struct fuse_notify_req *next)
+{
+	struct fuse_notify_req *prev = next->prev;
+	nreq->next = next;
+	nreq->prev = prev;
+	prev->next = nreq;
+	next->prev = nreq;
+}
+
+static void list_init_nreq(struct fuse_notify_req *nreq)
+{
+	nreq->next = nreq;
+	nreq->prev = nreq;
+}
+
+static void do_notify_reply(fuse_req_t req, fuse_ino_t nodeid,
+			    const void *inarg)
+{
+	struct fuse_ll *f = req->f;
+	struct fuse_notify_req *nreq;
+	struct fuse_notify_req *head;
+
+	pthread_mutex_lock(&f->lock);
+	head = &f->notify_list;
+	for (nreq = head->next; nreq != head; nreq = nreq->next) {
+		if (nreq->unique == req->unique) {
+			list_del_nreq(nreq);
+			break;
+		}
+	}
+	pthread_mutex_unlock(&f->lock);
+
+	if (nreq != head)
+		nreq->reply(nreq, req, nodeid, inarg);
+}
+
 static int send_notify_iov(struct fuse_ll *f, struct fuse_chan *ch,
 			   int notify_code, struct iovec *iov, int count)
 {
 	struct fuse_out_header out;
+
+	if (!f->got_init)
+		return -ENOTCONN;
 
 	out.unique = 0;
 	out.error = notify_code;
@@ -1750,6 +1802,78 @@ int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
 	return res;
 }
 
+struct fuse_retrieve_req {
+	struct fuse_notify_req nreq;
+	void *cookie;
+};
+
+static void fuse_ll_retrieve_reply(struct fuse_notify_req *nreq,
+				   fuse_req_t req, fuse_ino_t ino,
+				   const void *inarg)
+{
+	struct fuse_retrieve_req *rreq = container_of(nreq, struct fuse_retrieve_req, nreq);
+	struct fuse_notify_retrieve_in *arg = (struct fuse_notify_retrieve_in *) inarg;
+	struct fuse_buf buf = {
+		.size = arg->size,
+		.mem = PARAM(arg),
+	};
+	struct fuse_bufvec bufv = {
+		.buf = &buf,
+		.count = 1,
+	};
+
+	if (req->f->op.retrieve_reply)
+		req->f->op.retrieve_reply(rreq->cookie, ino, arg->offset, &bufv);
+	fuse_reply_none(req);
+	free(rreq);
+}
+
+int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
+				  size_t size, off_t offset, void *cookie)
+{
+	struct fuse_notify_retrieve_out outarg;
+	struct fuse_ll *f;
+	struct iovec iov[2];
+	struct fuse_retrieve_req *rreq;
+	int err;
+
+	if (!ch)
+		return -EINVAL;
+
+	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	if (!f)
+		return -ENODEV;
+
+	rreq = malloc(sizeof(*rreq));
+	if (rreq == NULL)
+		return -ENOMEM;
+
+	pthread_mutex_lock(&f->lock);
+	rreq->cookie = cookie;
+	rreq->nreq.unique = f->notify_ctr++;
+	rreq->nreq.reply = fuse_ll_retrieve_reply;
+	list_add_nreq(&rreq->nreq, &f->notify_list);
+	pthread_mutex_unlock(&f->lock);
+
+	outarg.notify_unique = rreq->nreq.unique;
+	outarg.nodeid = ino;
+	outarg.offset = offset;
+	outarg.size = size;
+
+	iov[1].iov_base = &outarg;
+	iov[1].iov_len = sizeof(outarg);
+
+	err = send_notify_iov(f, ch, FUSE_NOTIFY_RETRIEVE, iov, 2);
+	if (err) {
+		pthread_mutex_lock(&f->lock);
+		list_del_nreq(&rreq->nreq);
+		pthread_mutex_unlock(&f->lock);
+		free(rreq);
+	}
+
+	return err;
+}
+
 void *fuse_req_userdata(fuse_req_t req)
 {
 	return req->f->userdata;
@@ -1839,6 +1963,7 @@ static struct {
 	[FUSE_IOCTL]	   = { do_ioctl,       "IOCTL"	     },
 	[FUSE_POLL]	   = { do_poll,        "POLL"	     },
 	[FUSE_DESTROY]	   = { do_destroy,     "DESTROY"     },
+	[FUSE_NOTIFY_REPLY] = { do_notify_reply, "NOTIFY_REPLY" },
 	[CUSE_INIT]	   = { cuse_lowlevel_init, "CUSE_INIT"   },
 };
 
@@ -2057,6 +2182,8 @@ struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
 	f->atomic_o_trunc = 0;
 	list_init_req(&f->list);
 	list_init_req(&f->interrupts);
+	list_init_nreq(&f->notify_list);
+	f->notify_ctr = 1;
 	fuse_mutex_init(&f->lock);
 
 	err = pthread_key_create(&f->pipe_key, fuse_ll_pipe_destructor);
