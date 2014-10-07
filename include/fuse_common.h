@@ -67,8 +67,15 @@ struct fuse_file_info {
 	   2.9 */
 	unsigned int flock_release : 1;
 
+	/**
+	 * Can be filled in by open to indicate that the kernel should
+	 * try releasing the file synchronously.  Introduced in 3.0
+	 */
+	unsigned int sync_release : 1;
+
 	/** Padding.  Do not use*/
-	unsigned int padding : 27;
+	unsigned int padding : 25;
+	unsigned int padding1 : 32;
 
 	/** File handle.  May be filled in by filesystem in open().
 	    Available in all other file operations */

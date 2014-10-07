@@ -440,6 +440,8 @@ static void fill_open(struct fuse_open_out *arg,
 		arg->open_flags |= FOPEN_KEEP_CACHE;
 	if (f->nonseekable)
 		arg->open_flags |= FOPEN_NONSEEKABLE;
+	if (f->sync_release)
+		arg->open_flags |= FOPEN_SYNC_RELEASE;
 }
 
 int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e)
@@ -1454,6 +1456,8 @@ static void do_release(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		fi.flock_release = 1;
 		fi.lock_owner = arg->lock_owner;
 	}
+	if (arg->release_flags & FUSE_RELEASE_ISSYNC)
+		fi.sync_release = 1;
 
 	if (req->f->op.release)
 		req->f->op.release(req, nodeid, &fi);
@@ -1525,6 +1529,9 @@ static void do_releasedir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	memset(&fi, 0, sizeof(fi));
 	fi.flags = arg->flags;
 	fi.fh = arg->fh;
+
+	if (arg->release_flags & FUSE_RELEASE_ISSYNC)
+		fi.sync_release = 1;
 
 	if (req->f->op.releasedir)
 		req->f->op.releasedir(req, nodeid, &fi);

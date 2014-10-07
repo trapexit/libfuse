@@ -75,6 +75,8 @@ struct fuse_config {
 	int direct_io;
 	int kernel_cache;
 	int auto_cache;
+	int sync_release;
+	int nosync_release;
 	int intr;
 	int intr_signal;
 	int help;
@@ -1640,9 +1642,10 @@ int fuse_fs_release(struct fuse_fs *fs,	 const char *path,
 	fuse_get_context()->private_data = fs->user_data;
 	if (fs->op.release) {
 		if (fs->debug)
-			fprintf(stderr, "release%s[%llu] flags: 0x%x\n",
+			fprintf(stderr, "release%s[%llu] flags: 0x%x%s\n",
 				fi->flush ? "+flush" : "",
-				(unsigned long long) fi->fh, fi->flags);
+				(unsigned long long) fi->fh, fi->flags,
+				fi->sync_release ? " (sync)" : "");
 
 		return fs->op.release(path, fi);
 	} else {
@@ -1920,8 +1923,9 @@ int fuse_fs_releasedir(struct fuse_fs *fs, const char *path,
 	fuse_get_context()->private_data = fs->user_data;
 	if (fs->op.releasedir) {
 		if (fs->debug)
-			fprintf(stderr, "releasedir[%llu] flags: 0x%x\n",
-				(unsigned long long) fi->fh, fi->flags);
+			fprintf(stderr, "releasedir[%llu] flags: 0x%x%s\n",
+				(unsigned long long) fi->fh, fi->flags,
+				fi->sync_release ? " (sync)" : "");
 
 		return fs->op.releasedir(path, fi);
 	} else {
@@ -2838,6 +2842,11 @@ static void fuse_lib_mknod(fuse_req_t req, fuse_ino_t parent, const char *name,
 			fi.flags = O_CREAT | O_EXCL | O_WRONLY;
 			err = fuse_fs_create(f->fs, path, mode, &fi);
 			if (!err) {
+				if (f->conf.sync_release)
+					fi.sync_release = 1;
+				if (f->conf.nosync_release)
+					fi.sync_release = 0;
+
 				err = lookup_path(f, parent, name, path, &e,
 						  &fi);
 				fuse_fs_release(f->fs, path, &fi);
@@ -3066,6 +3075,10 @@ static void fuse_lib_create(fuse_req_t req, fuse_ino_t parent,
 			} else {
 				if (f->conf.direct_io)
 					fi->direct_io = 1;
+				if (f->conf.sync_release)
+					fi->sync_release = 1;
+				if (f->conf.nosync_release)
+					fi->sync_release = 0;
 				if (f->conf.kernel_cache)
 					fi->keep_cache = 1;
 
@@ -3143,6 +3156,10 @@ static void fuse_lib_open(fuse_req_t req, fuse_ino_t ino,
 		if (!err) {
 			if (f->conf.direct_io)
 				fi->direct_io = 1;
+			if (f->conf.sync_release)
+				fi->sync_release = 1;
+			if (f->conf.nosync_release)
+				fi->sync_release = 0;
 			if (f->conf.kernel_cache)
 				fi->keep_cache = 1;
 
@@ -3277,6 +3294,13 @@ static void fuse_lib_opendir(fuse_req_t req, fuse_ino_t ino,
 	if (!err) {
 		fuse_prepare_interrupt(f, req, &d);
 		err = fuse_fs_opendir(f->fs, path, &fi);
+		if (!err) {
+			llfi->sync_release = fi.sync_release;
+			if (f->conf.sync_release)
+				llfi->sync_release = 1;
+			if (f->conf.nosync_release)
+				llfi->sync_release = 0;
+		}
 		fuse_finish_interrupt(f, req, &d);
 		dh->fh = fi.fh;
 	}
@@ -3629,6 +3653,8 @@ static void fuse_lib_releasedir(fuse_req_t req, fuse_ino_t ino,
 	struct fuse_file_info fi;
 	struct fuse_dh *dh = get_dirhandle(llfi, &fi);
 	char *path;
+
+	fi.sync_release = llfi->sync_release;
 
 	get_path_nullok(f, ino, &path);
 
@@ -4422,6 +4448,8 @@ static const struct fuse_opt fuse_lib_opts[] = {
 	FUSE_LIB_OPT("kernel_cache",	      kernel_cache, 1),
 	FUSE_LIB_OPT("auto_cache",	      auto_cache, 1),
 	FUSE_LIB_OPT("noauto_cache",	      auto_cache, 0),
+	FUSE_LIB_OPT("sync_release",          sync_release, 1),
+	FUSE_LIB_OPT("nosync_release",        nosync_release, 1),
 	FUSE_LIB_OPT("umask=",		      set_mode, 1),
 	FUSE_LIB_OPT("umask=%o",	      umask, 0),
 	FUSE_LIB_OPT("uid=",		      set_uid, 1),
@@ -4451,6 +4479,7 @@ static void fuse_lib_help(void)
 "    -o direct_io           use direct I/O\n"
 "    -o kernel_cache        cache files in kernel\n"
 "    -o [no]auto_cache      enable caching based on modification times (off)\n"
+"    -o [no]sync_release    enable synchronous release\n"
 "    -o umask=M             set file permissions (octal)\n"
 "    -o uid=N               set file owner\n"
 "    -o gid=N               set file group\n"
