@@ -247,35 +247,52 @@ size_t fuse_dirent_size(size_t namelen)
 	return FUSE_DIRENT_ALIGN(FUSE_NAME_OFFSET + namelen);
 }
 
-char *fuse_add_dirent(char *buf, const char *name, const struct stat *stbuf,
-		      off_t off)
+#ifndef IFTODT
+#define IFTODT(mode) (((mode) & 0170000) >> 12)
+#endif
+
+static char *fuse_add_dirent_core(char *buf,
+                                  const char *name, const size_t namelen,
+                                  const size_t entsize,
+                                  const struct stat *stbuf, const off_t off)
 {
-	unsigned namelen = strlen(name);
 	unsigned entlen = FUSE_NAME_OFFSET + namelen;
-	unsigned entsize = fuse_dirent_size(namelen);
 	unsigned padlen = entsize - entlen;
 	struct fuse_dirent *dirent = (struct fuse_dirent *) buf;
 
 	dirent->ino = stbuf->st_ino;
 	dirent->off = off;
 	dirent->namelen = namelen;
-	dirent->type = (stbuf->st_mode & 0170000) >> 12;
+	dirent->type = IFTODT(stbuf->st_mode);
 	strncpy(dirent->name, name, namelen);
 	if (padlen)
 		memset(buf + entlen, 0, padlen);
 
-	return buf + entsize;
+	return (buf + entsize);
+}
+
+char *fuse_add_dirent(char *buf, const char *name, const struct stat *stbuf,
+		      off_t off)
+{
+        size_t namelen = strlen(name);
+	size_t entsize = fuse_dirent_size(namelen);
+
+	return fuse_add_dirent_core(buf, name, namelen, entsize, stbuf, off);
 }
 
 size_t fuse_add_direntry(fuse_req_t req, char *buf, size_t bufsize,
 			 const char *name, const struct stat *stbuf, off_t off)
 {
+        size_t namelen;
 	size_t entsize;
 
 	(void) req;
-	entsize = fuse_dirent_size(strlen(name));
-	if (entsize <= bufsize && buf)
-		fuse_add_dirent(buf, name, stbuf, off);
+
+        namelen = strlen(name);
+	entsize = fuse_dirent_size(namelen);
+	if ((buf != NULL) && (entsize <= bufsize))
+                fuse_add_dirent_core(buf, name, namelen, entsize, stbuf, off);
+
 	return entsize;
 }
 
