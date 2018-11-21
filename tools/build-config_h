@@ -1,0 +1,12 @@
+#!/bin/sh
+
+TGT=config.h
+
+echo "#pragma once" | tee "${TGT}"
+
+for file in *.c
+do
+    cc -o /dev/null -c "${file}" && echo "#define ${file%.c}" | tee -a "${TGT}"
+done
+
+mv -vf "${TGT}" ..
