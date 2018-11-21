@@ -1,12 +1,12 @@
 #!/bin/sh
 
-TGT=config.h
+BASEPATH=$(realpath $0)
+BASEPATH=$(dirname ${BASEPATH})
 
-echo "#pragma once" | tee "${TGT}"
+echo "#pragma once"
 
-for file in *.c
+for file in ${BASEPATH}/*.c
 do
-    cc -o /dev/null -c "${file}" && echo "#define ${file%.c}" | tee -a "${TGT}"
+    cc -o /dev/null -c "${file}" && \
+        echo "#define $(basename ${file%.c})"
 done
-
-mv -vf "${TGT}" ..
