@@ -23,16 +23,23 @@ CFLAGS = $(OPT) \
 	 '-DFUSE_USE_VERSION=34' \
 	 '-DFUSERMOUNT_DIR="/usr/local/bin"' \
 	 '-DPACKAGE_VERSION=$(VERSION)' \
+         '-DFUSE_CONF="/usr/local/etc/fuse.conf"' \
 	 -Iinclude \
 	 -MMD
 
-all: libmffl.a
+all: obj/libmffl.a mergerfs-mount mount.mergerfs
 
 include/config.h:
 	tools/build-config_h | tee include/config.h
 
-libmffl.a: obj/obj-stamp include/config.h $(OBJ)
+obj/libmffl.a: obj/obj-stamp include/config.h $(OBJ)
 	ar rcs obj/libmffl.a $(OBJ)
+
+mergerfs-mount: include/config.h util/fusermount.c lib/mount_util.c
+	$(CC) $(OPT) $(CFLAGS) -Ilib -o mergerfs-mount util/fusermount.c lib/mount_util.c
+
+mount.mergerfs: obj/libmffl.a util/mount.fuse.c
+	$(CC) $(OPT) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libmffl.a -ldl -pthread
 
 obj/obj-stamp:
 	mkdir -p obj
@@ -42,6 +49,6 @@ obj/%.o: lib/%.c
 	$(CC) $(OPT) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf obj include/config.h
+	rm -rf obj include/config.h mergerfs-mount mount.mergerfs
 
 distclean: clean

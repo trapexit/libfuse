@@ -4670,7 +4670,9 @@ void fuse_lib_help(struct fuse_args *args)
 	fuse_lowlevel_help();
 
 	/* Print help for builtin modules */
+#ifdef HAVE_SUBDIR
 	print_module_help("subdir", &fuse_module_subdir_factory);
+#endif
 #ifdef HAVE_ICONV
 	print_module_help("iconv", &fuse_module_iconv_factory);
 #endif
@@ -4682,7 +4684,7 @@ void fuse_lib_help(struct fuse_args *args)
 			   fuse_lib_opt_proc) == -1
 	    || !conf.modules)
 		return;
-	
+
 	char *module;
 	char *next;
 	struct fuse_module *m;
@@ -4700,7 +4702,7 @@ void fuse_lib_help(struct fuse_args *args)
 	}
 }
 
-				      
+
 
 static int fuse_init_intr_signal(int signum, int *installed)
 {
@@ -4855,7 +4857,9 @@ struct fuse *fuse_new_31(struct fuse_args *args,
 	/* Have the builtin modules already been registered? */
 	if (builtin_modules_registered == 0) {
 		/* If not, register them. */
+#ifdef HAVE_SUBDIR
 		fuse_register_module("subdir", fuse_module_subdir_factory, NULL);
+#endif
 #ifdef HAVE_ICONV
 		fuse_register_module("iconv", fuse_module_iconv_factory, NULL);
 #endif
