@@ -27,19 +27,19 @@ CFLAGS = $(OPT) \
 	 -Iinclude \
 	 -MMD
 
-all: obj/libmffl.a mergerfs-mount mount.mergerfs
+all: obj/libfuse.a mergerfs-mount mount.mergerfs
 
 include/config.h:
 	tools/build-config_h | tee include/config.h
 
-obj/libmffl.a: obj/obj-stamp include/config.h $(OBJ)
-	ar rcs obj/libmffl.a $(OBJ)
+obj/libfuse.a: obj/obj-stamp include/config.h $(OBJ)
+	ar rcs obj/libfuse.a $(OBJ)
 
 mergerfs-mount: include/config.h util/fusermount.c lib/mount_util.c
 	$(CC) $(OPT) $(CFLAGS) -Ilib -o mergerfs-mount util/fusermount.c lib/mount_util.c
 
-mount.mergerfs: obj/libmffl.a util/mount.fuse.c
-	$(CC) $(OPT) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libmffl.a -ldl -pthread
+mount.mergerfs: obj/libfuse.a util/mount.fuse.c
+	$(CC) $(OPT) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libfuse.a -ldl -pthread
 
 obj/obj-stamp:
 	mkdir -p obj
