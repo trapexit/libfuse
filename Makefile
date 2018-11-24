@@ -1,6 +1,8 @@
 VERSION = "3.4.0"
 OPT = -O2
 
+DESTDIR = "/"
+BINDIR = "/bin"
 SRC   = lib/buffer.c \
 	lib/cuse_lowlevel.c \
 	lib/fuse.c \
@@ -36,19 +38,25 @@ obj/libfuse.a: obj/obj-stamp include/config.h $(OBJ)
 	ar rcs obj/libfuse.a $(OBJ)
 
 mergerfs-mount: include/config.h util/fusermount.c lib/mount_util.c
-	$(CC) $(OPT) $(CFLAGS) -Ilib -o mergerfs-mount util/fusermount.c lib/mount_util.c
+	$(CC) $(CFLAGS) -Ilib -o mergerfs-mount util/fusermount.c lib/mount_util.c
 
 mount.mergerfs: obj/libfuse.a util/mount.fuse.c
-	$(CC) $(OPT) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libfuse.a -ldl -pthread
+	$(CC) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libfuse.a -ldl -pthread
 
 obj/obj-stamp:
 	mkdir -p obj
 	touch $@
 
 obj/%.o: lib/%.c
-	$(CC) $(OPT) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf obj include/config.h mergerfs-mount mount.mergerfs
 
 distclean: clean
+
+install:
+	install -D mergerfs-mount "$(DESTDIR)$(BINDIR)/mergerfs-mount"
+	chown root:root "$(DESTDIR)$(BINDIR)/mergerfs-mount"
+	chmod u+s "$(DESTDIR)$(BINDIR)/mergerfs-mount"
+	install -D mount.mergerfs "$(DESTDIR)$(BINDIR)/mount.mergerfs"
