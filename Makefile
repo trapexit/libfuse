@@ -3,6 +3,7 @@ OPT = -O2
 
 DESTDIR = "/"
 BINDIR = "/bin"
+SBINDIR = "/sbin"
 SRC   = lib/buffer.c \
 	lib/cuse_lowlevel.c \
 	lib/fuse.c \
@@ -59,4 +60,4 @@ install:
 	install -D mergerfs-mount "$(DESTDIR)$(BINDIR)/mergerfs-mount"
 	chown root:root "$(DESTDIR)$(BINDIR)/mergerfs-mount"
 	chmod u+s "$(DESTDIR)$(BINDIR)/mergerfs-mount"
-	install -D mount.mergerfs "$(DESTDIR)$(BINDIR)/mount.mergerfs"
+	install -D mount.mergerfs "$(DESTDIR)$(SBINDIR)/mount.mergerfs"
