@@ -201,12 +201,14 @@ static void drop_and_lock_capabilities(void)
 	/* Drop capabilities. */
 	set_capabilities(0);
 
+#ifdef PR_SET_NO_NEW_PRIVS
 	/* Prevent re-acquisition of privileges. */
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1) {
 		fprintf(stderr, "%s: Failed to set no_new_privs: %s\n",
 			progname, strerror(errno));
 		exit(1);
 	}
+#endif
 }
 #endif
 
