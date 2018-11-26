@@ -29,6 +29,10 @@ CFLAGS = $(OPT) \
          '-DFUSE_CONF="/usr/local/etc/fuse.conf"' \
 	 -Iinclude \
 	 -MMD
+LDFLAGS = \
+	-ldl \
+	-lrt \
+	-pthread
 
 all: obj/libfuse.a mergerfs-mount mount.mergerfs
 
@@ -42,7 +46,7 @@ mergerfs-mount: include/config.h util/fusermount.c lib/mount_util.c
 	$(CC) $(CFLAGS) -Ilib -o mergerfs-mount util/fusermount.c lib/mount_util.c
 
 mount.mergerfs: obj/libfuse.a util/mount.fuse.c
-	$(CC) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libfuse.a -ldl -pthread
+	$(CC) $(CFLAGS) -o mount.mergerfs util/mount.fuse.c obj/libfuse.a $(LDFLAGS)
 
 obj/obj-stamp:
 	mkdir -p obj
@@ -55,9 +59,12 @@ clean:
 	rm -rf obj include/config.h mergerfs-mount mount.mergerfs
 
 distclean: clean
+	git clean -fdx
 
 install:
 	install -D mergerfs-mount "$(DESTDIR)$(BINDIR)/mergerfs-mount"
 	chown root:root "$(DESTDIR)$(BINDIR)/mergerfs-mount"
 	chmod u+s "$(DESTDIR)$(BINDIR)/mergerfs-mount"
 	install -D mount.mergerfs "$(DESTDIR)$(SBINDIR)/mount.mergerfs"
+
+-include $(DEPS)
