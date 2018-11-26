@@ -4,7 +4,8 @@ OPT = -O2
 DESTDIR = "/"
 BINDIR = "/bin"
 SBINDIR = "/sbin"
-SRC   = lib/buffer.c \
+SRC   = \
+	lib/buffer.c \
 	lib/cuse_lowlevel.c \
 	lib/fuse.c \
 	lib/fuse_loop.c \
