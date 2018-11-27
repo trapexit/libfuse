@@ -5,6 +5,7 @@ BASEPATH=$(dirname ${BASEPATH})
 
 echo "#pragma once"
 
+IFS=
 for file in ${BASEPATH}/*.c
 do
     cc -o /dev/null -c "${file}" && \
