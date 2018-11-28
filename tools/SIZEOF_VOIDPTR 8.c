@@ -4,7 +4,7 @@ int
 main(int   argc,
      char *argv[])
 {
-  STATIC_ASSERT(sizeof(void*) == 8,sizeof_voidptr);
+	STATIC_ASSERT(sizeof(void*) == 8);
 
   return 0;
 }
