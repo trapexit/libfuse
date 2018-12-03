@@ -1,12 +1,11 @@
-#define _GNU_SOURCE
 #include <fcntl.h>
-#include <sys/uio.h>
+#include <sys/stat.h>
 
 int
 main(int   argc,
      char *argv[])
 {
-  vmsplice;
+  (void)utimensat;
 
   return 0;
 }

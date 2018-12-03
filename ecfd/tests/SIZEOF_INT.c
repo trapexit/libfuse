@@ -1,11 +1,10 @@
-#include <fcntl.h>
-#include <sys/stat.h>
+#include <stdio.h>
 
 int
 main(int   argc,
      char *argv[])
 {
-  utimensat;
+  printf("%ld",sizeof(int));
 
   return 0;
 }

@@ -38,7 +38,7 @@ LDFLAGS = \
 all: obj/libfuse.a mergerfs-mount mount.mergerfs
 
 include/config.h:
-	tools/build-config_h | tee include/config.h
+	ecfd/build | tee include/config.h
 
 obj/libfuse.a: obj/obj-stamp include/config.h $(OBJ)
 	ar rcs obj/libfuse.a $(OBJ)

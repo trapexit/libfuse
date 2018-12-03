@@ -1,11 +1,11 @@
+#define _GNU_SOURCE
 #include <fcntl.h>
-#include <unistd.h>
 
 int
 main(int   argc,
      char *argv[])
 {
-  readlinkat;
+  (void)splice;
 
   return 0;
 }

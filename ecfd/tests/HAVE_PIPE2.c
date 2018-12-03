@@ -1,11 +1,12 @@
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <unistd.h>
 
 int
 main(int   argc,
      char *argv[])
 {
-  copy_file_range;
+  (void)pipe2;
 
   return 0;
 }

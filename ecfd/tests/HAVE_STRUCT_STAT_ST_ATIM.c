@@ -8,7 +8,7 @@ main(int   argc,
 {
   struct stat st;
 
-  st.st_atim;
-  
+  (void)st.st_atim;
+
   return 0;
 }
